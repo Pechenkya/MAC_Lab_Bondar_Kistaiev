@@ -69,7 +69,7 @@ class R:
         u_b = 0
         v_b = 1
 
-        
+
         return self
 
     def __mod__(self, q: int):
@@ -79,10 +79,10 @@ class R:
         return R(self.a % q)
 
     def __add__(self, other):
-        if not (self.q == other.q and self.n == other.n):
+        if not (self.n == other.n):
             raise RuntimeError("Can't multiply polynomials from different rings")
         
-        return R(self.q, self.a + other.a)
+        return R(self.a + other.a)
         
 
 
