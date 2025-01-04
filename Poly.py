@@ -71,7 +71,14 @@ class NPoly:
         q = NPoly({0: 0})
 
         while (a.n >= b.n) and (a != NPoly({0: 0})):
-            qi = NPoly({a.n - b.n :a[a.n]*pow(int(b[b.n]), -1, mod)}) % mod
+            if a[a.n] % b[b.n] == 0:
+                c = a[a.n] // b[b.n]
+            elif np.gcd(int(b[b.n]), mod) == 1:
+                c = a[a.n] * pow(int(b[b.n]), -1, mod)
+            else:
+                return NPoly({0 : 0}), NPoly({0 : 0})
+            
+            qi = NPoly({a.n - b.n : c}) % mod
             a = (a - qi*b) % mod
             q = q + qi
 
@@ -113,6 +120,9 @@ class R:
     def __getitem__(self, key):
         return self.a[key]
 
+    def __eq__(self, other):
+        return (np.array_equal(self.a, other.a) and self.n == other.n)
+
     def __mul__(self, other):
         if not (self.n == other.n):
             raise RuntimeError("Can't multiply polynomials from different rings")
@@ -140,11 +150,13 @@ class R:
 
         while (r[-1] != NPoly({0: 0})) and (r[-1] != NPoly({0: 1})):
             q, ri = r[-2].div_mod(r[-1], mod)
+
+            if q == NPoly({0 : 0}) and ri == NPoly({0 : 0}):
+                return R(self.n, np.zeros(self.n))
+
             r.append(ri % mod)
             u_a.append((u_a[-2] - q*u_a[-1]) % mod)
             v_b.append((v_b[-2] - q*v_b[-1]) % mod)
-
-            print(r[-1])
 
 
         if r[-1] == NPoly({0: 1}):
@@ -171,23 +183,28 @@ class R:
 
     def __add__(self, other):
         if not (self.n == other.n):
-            raise RuntimeError("Can't multiply polynomials from different rings")
+            raise RuntimeError("Can't add polynomials from different rings")
         
         return R(self.n, self.a + other.a)
+    
+    def __sub__(self, other):
+        if not (self.n == other.n):
+            raise RuntimeError("Can't subtract polynomials from different rings")
         
+        return R(self.n, self.a - other.a)
 
 def H(m):
     d1 = SHA1.new(data=m).digest()
 
-    df = SHA1.new(d1 + bytes([0]))
+    df = SHA1.new(d1 + bytes([0])).digest()
     for i in range(1, 13):
-        df += SHA1.new(d1 + bytes([i]))
+        df += SHA1.new(d1 + bytes([i])).digest()
 
     a = []
     for b in df:
         a.append(b & 127)
 
-    return R(251, a)
+    return R(251, a[:251])
     
 
 def norm(p1, p2):
@@ -195,8 +212,8 @@ def norm(p1, p2):
 
 
 def solve_NTRU_eq(f, g, q):
-    F = R(f.a)
-    G = R(g.a)
+    F = R(251, f.a)
+    G = R(251, g.a)
 
     return F, G
 
@@ -207,12 +224,12 @@ def solve_NTRU_eq(f, g, q):
 # for k in range(4):
 #     print(a1 + np.roll(np.flip(a2), -n+k+1))
 
-a = R(6,np.array([1, 5, 1, 1, 5, 6]))
-b = NPoly({0:1, 3:5, 4:1})
+# a = R(6,np.array([1, 5, 1, 1, 5, 6]))
+# b = NPoly({0:1, 3:5, 4:1})
 
-print(a.get_inv(11))
+# print(a.get_inv(11))
 
-print((a * a.get_inv(11)) % 11)
+# print((a * a.get_inv(11)) % 11)
 # print(f'a =  {a}')
 # print(f'b =  {b}\n')
 

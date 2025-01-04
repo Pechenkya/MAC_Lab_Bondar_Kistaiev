@@ -1,27 +1,24 @@
-from Poly import R
-
-def solve_NTRU_eq(f, g, q):
-    F = R(f.a)
-    G = R(g.a)
-
-    return F, G
-
+from Poly import *
 import random as rng
 from enum import Enum
 class NTRU_Methods(Enum):
     STANDART = 1
     TRANSPOSE = 2
 
-def H(Data) -> R:
-    return R([0])
-
-def norm(p1, p2) -> float:
-    return 0.0
-
 def sample_random_bin_poly(N, d):
     poly = rng.sample([0, 1], N, counts=[N - d, d])
-    print(poly)
-    return R(poly)
+    return R(N, poly)
+
+def sample_oboroten_bin_poly(N, d, mod):
+    i = 0
+    while True:
+        if i % 10 == 0:
+            print(f'try: {i}')
+        i += 1
+        poly = sample_random_bin_poly(N, d)
+        if poly.get_inv(mod) != R(N, np.zeros(N)):
+            return poly
+
 
 def NTRU_init_parameters(N, q, d_f, d_g, B, delta, t=NTRU_Methods.TRANSPOSE):
     # Generate B private Lattice bases and one public Lattice basis
@@ -29,7 +26,7 @@ def NTRU_init_parameters(N, q, d_f, d_g, B, delta, t=NTRU_Methods.TRANSPOSE):
     lattice_f_shtrih = []
     lattice_h = []
     for _ in range(B, -1, -1):
-        f, g = [sample_random_bin_poly(N, d_f), sample_random_bin_poly(N, d_g)]
+        f, g = [sample_oboroten_bin_poly(N, d_f, q), sample_oboroten_bin_poly(N, d_g, q)]
         F, G = solve_NTRU_eq(f, g, q)
         if t is NTRU_Methods.STANDART:
             lattice_f.append(f)
@@ -53,7 +50,7 @@ def NTRU_sign(Data: bytes, private_key, pub_key):
     r = 0
 
     while True:    
-        s = R([0], N)
+        s = R(N, [0]*N)
         m = m_0 = H(Data + r.to_bytes(16, 'little'))
 
         # Perturb the point using the private lattices
@@ -71,7 +68,7 @@ def NTRU_sign(Data: bytes, private_key, pub_key):
         s = s + s_0
 
         # Check the signature
-        b = norm(s, (s * h - m_0) % q)
+        b = norm(s, (s * h[-1] - m_0) % q)
         if b < delta:
             break
         else:
@@ -87,3 +84,5 @@ def NTRU_verify(signature_pack, pub_key):
     
     b = norm(s, (s * h - m) % q)
     return b < delta
+
+
