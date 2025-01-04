@@ -1,4 +1,4 @@
-from R import R
+from Poly import R
 
 def solve_NTRU_eq(f, g, q):
     F = R(f.a)

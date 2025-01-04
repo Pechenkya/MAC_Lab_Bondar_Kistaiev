@@ -1,6 +1,6 @@
 import numpy as np
 import scipy.signal as scs
-
+from Crypto.Hash import SHA1 
 
 class NPoly:
     def __init__(self, data):
@@ -79,10 +79,30 @@ class NPoly:
 
 
 class R:
-    def __init__(self, data):
-        if isinstance(data, np.ndarray):
-            self.a = data
-            self.n = len(data)
+    def __init__(self, n: int, data):
+        if not (int(n) == n and n > 1):
+            raise "p!Ш0L n@x1y"
+
+        self.n = n
+
+        if isinstance(data, np.ndarray) or isinstance(data, list):
+            if len(data) > n: 
+                raise RuntimeError("data is too big for that modulus")
+
+            self.a = np.zeros(self.n, dtype=np.int32)
+            self.a[:len(data)] = np.round(np.array(data))
+        elif isinstance(data, dict):
+            m = max(data.keys())
+            if m >= n: 
+                raise RuntimeError("max power is too big for that modulus")
+
+            self.a = np.zeros(self.n, dtype=np.int32)
+            for (p, c) in data.items():
+                if not (int(p) == p and p >= 0 and int(c) == c):
+                    raise RuntimeError("Incorrect dict: (power, coefficent) pairs")
+
+                self.a[p] = c
+
         else:
             raise "p!Ш0L n@x1y"
     
@@ -92,7 +112,6 @@ class R:
 
     def __getitem__(self, key):
         return self.a[key]
-
 
     def __mul__(self, other):
         if not (self.n == other.n):
@@ -105,8 +124,8 @@ class R:
         for k in range(n):
             res[k] = self.a.dot(np.roll(other_a, -n+k+1))
 
-        return R(res)
-    
+        return R(n, res)
+
     def _msp(self):
         return self.n - np.argmax(np.flip(self.a) != 0) - 1
 
@@ -134,22 +153,45 @@ class R:
             if v.n >= self.n:
                 _, v = v.div_mod(a, mod)
             coeffs[:len(v.a)] = v.a
-            return R(coeffs)
+            return R(self.n, coeffs)
         else:
-            return R(np.zeros(self.n))
+            return R(self.n, np.zeros(self.n))
+
+    def float_scalar_mult(self, s):
+        return R(self.n, np.round(self.a * s))
+
+    def _norm(self):
+        return np.sqrt((self.a.dot(self.a) - (sum(self.a)**2 / self.n)))
 
     def __mod__(self, q: int):
         if not (q > 1):
             raise RuntimeError("Incorrect modulus")
         
-        return R(self.a % q)
+        return R(self.n, self.a % q)
 
     def __add__(self, other):
         if not (self.n == other.n):
             raise RuntimeError("Can't multiply polynomials from different rings")
         
-        return R(self.a + other.a)
+        return R(self.n, self.a + other.a)
         
+
+def H(m):
+    d1 = SHA1.new(data=m).digest()
+
+    df = SHA1.new(d1 + bytes([0]))
+    for i in range(1, 13):
+        df += SHA1.new(d1 + bytes([i]))
+
+    a = []
+    for b in df:
+        a.append(b & 127)
+
+    return R(251, a)
+    
+
+def norm(p1, p2):
+    return np.sqrt(p1._norm()**2 + p2._norm()**2)
 
 
 def solve_NTRU_eq(f, g, q):
@@ -165,7 +207,7 @@ def solve_NTRU_eq(f, g, q):
 # for k in range(4):
 #     print(a1 + np.roll(np.flip(a2), -n+k+1))
 
-a = R(np.array([1, 5, 1, 1, 5, 6]))
+a = R(6,np.array([1, 5, 1, 1, 5, 6]))
 b = NPoly({0:1, 3:5, 4:1})
 
 print(a.get_inv(11))
