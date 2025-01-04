@@ -4,27 +4,78 @@ import scipy.signal as scs
 
 class NPoly:
     def __init__(self, data):
-        if isinstance(data, np.ndarray):
+        if isinstance(data, np.ndarray) or isinstance(data, list):
             msp = np.where(np.flip(data) != 0)[0]
             if len(msp) == 0:
                 self.n = 0
-                self.a = np.zeros(1)
+                self.a = np.zeros(1, dtype=np.int32)
             else:
                 self.n = len(data) - msp[0] - 1
-                self.a = data[0:self.n+1]
+                self.a = np.round(np.array(data[0:self.n+1]))
+        elif isinstance(data, dict):
+            self.n = max(data.keys())
+            self.a = np.zeros(self.n+1, dtype=np.int32)
+            for (p, c) in data.items():
+                if not (int(p) == p and p >= 0 and int(c) == c):
+                    raise RuntimeError("Incorrect dict: (power, coefficent) pairs")
+
+                self.a[p] = c
+
         else:
             raise "p!Ш0L n@x1y"
         
     def __str__(self):
-        return np.array2string(self.a)
+        s = ""
+        for p in range(self.n, -1, -1):
+            if self.a[p] == 0:
+                continue
+
+            s = s + (f"{self.a[p]}x^{p} + " if p != 0 else f"{self.a[p]}")
+                 
+        return s
+
+    def __getitem__(self, key):
+        return self.a[key]
+
+    def __eq__(self, other):
+        return (np.array_equal(self.a, other.a) and self.n == other.n)
+
+    def __mod__(self, q: int):
+        if not (q > 1):
+            raise RuntimeError("Incorrect modulus")
+        
+        return NPoly(np.round(self.a % q).astype(np.int32))
 
     def __mul__(self, other):
         res = scs.fftconvolve(self.a, other.a)
     
-        return NPoly(np.round(res))
+        return NPoly(np.round(np.real(res)).astype(np.int32))
     
     def __add__(self, other):
-        return NPoly(self.a + other.a)
+        if self.n < other.n:
+            res = other.a
+            res[:len(self.a)] += self.a
+        else:
+            res = self.a
+            res[:len(other.a)] += other.a
+
+        return NPoly(np.round(res).astype(np.int32))
+
+    def __sub__(self, other):
+        return self + NPoly(-other.a)
+
+    def div_mod(self, other, mod):
+        # a = q*b + r
+        a = self % mod
+        b = other % mod
+        q = NPoly({0: 0})
+
+        while (a.n >= b.n) and (a != NPoly({0: 0})):
+            qi = NPoly({a.n - b.n :a[a.n]*pow(int(b[b.n]), -1, mod)}) % mod
+            a = (a - qi*b) % mod
+            q = q + qi
+
+        return q, a
 
 
 class R:
@@ -35,8 +86,13 @@ class R:
         else:
             raise "p!Ш0L n@x1y"
     
+
     def __str__(self):
         return np.array2string(self.a)
+
+    def __getitem__(self, key):
+        return self.a[key]
+
 
     def __mul__(self, other):
         if not (self.n == other.n):
@@ -54,23 +110,33 @@ class R:
     def _msp(self):
         return self.n - np.argmax(np.flip(self.a) != 0) - 1
 
-    def get_inv(self, q: int):
-        b = NPoly(self.a)
+    def get_inv(self, mod: int):
+        b = NPoly(self.a) % mod
+        a = NPoly({self.n: 1, 0: -1}) % mod
 
-        a = np.zeros(self.n+1)
-        a[0] = -1
-        a[-1] = 1
-        a = NPoly(b)
-
-
-        u_a = 1
-        v_a = 0
-
-        u_b = 0
-        v_b = 1
+        r = [a, b]
+        u_a = [NPoly([1]), NPoly([0])]
+        v_b = [NPoly([0]), NPoly([1])]
 
 
-        return self
+        while (r[-1] != NPoly({0: 0})) and (r[-1] != NPoly({0: 1})):
+            q, ri = r[-2].div_mod(r[-1], mod)
+            r.append(ri % mod)
+            u_a.append((u_a[-2] - q*u_a[-1]) % mod)
+            v_b.append((v_b[-2] - q*v_b[-1]) % mod)
+
+            print(r[-1])
+
+
+        if r[-1] == NPoly({0: 1}):
+            coeffs = np.zeros(self.n)
+            v = v_b[-1]
+            if v.n >= self.n:
+                _, v = v.div_mod(a, mod)
+            coeffs[:len(v.a)] = v.a
+            return R(coeffs)
+        else:
+            return R(np.zeros(self.n))
 
     def __mod__(self, q: int):
         if not (q > 1):
@@ -86,7 +152,6 @@ class R:
         
 
 
-
 def solve_NTRU_eq(f, g, q):
     F = R(f.a)
     G = R(g.a)
@@ -100,13 +165,21 @@ def solve_NTRU_eq(f, g, q):
 # for k in range(4):
 #     print(a1 + np.roll(np.flip(a2), -n+k+1))
 
+a = R(np.array([1, 5, 1, 1, 5, 6]))
+b = NPoly({0:1, 3:5, 4:1})
 
-a = NPoly(np.array([1, -3, 0, 0, 0]))
-b = NPoly(np.array([1, 0, 0, 5]))
+print(a.get_inv(11))
 
-print(a)
-print(b)
+print((a * a.get_inv(11)) % 11)
+# print(f'a =  {a}')
+# print(f'b =  {b}\n')
 
-c = a * b
+# q, r = a.div_mod(b, 11)
 
-print(c)
+# print('a = q*b + r')
+# print(f'q =  {q}')
+# print(f'r =  {r}')
+
+# print('\n Check')
+
+# print(f'q*b + r =  {(q*b + r) % 11}')
