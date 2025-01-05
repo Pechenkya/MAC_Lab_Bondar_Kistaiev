@@ -71,17 +71,20 @@ class NPoly:
         q = NPoly({0: 0})
 
         while (a.n >= b.n) and (a != NPoly({0: 0})):
+            # print(f'{a.n}, {b.n} : {a[a.n]}, {b[b.n]}')
             if a[a.n] % b[b.n] == 0:
                 c = a[a.n] // b[b.n]
             elif np.gcd(int(b[b.n]), mod) == 1:
                 c = a[a.n] * pow(int(b[b.n]), -1, mod)
             else:
-                return NPoly({0 : 0}), NPoly({0 : 0})
+                # print("exit -")
+                return q, a
             
             qi = NPoly({a.n - b.n : c}) % mod
             a = (a - qi*b) % mod
             q = q + qi
 
+        # print("exit +")
         return q, a
 
 
@@ -139,14 +142,13 @@ class R:
     def _msp(self):
         return self.n - np.argmax(np.flip(self.a) != 0) - 1
 
-    def get_inv(self, mod: int):
+    def get_inv_p(self, mod: int):
         b = NPoly(self.a) % mod
         a = NPoly({self.n: 1, 0: -1}) % mod
 
         r = [a, b]
         u_a = [NPoly([1]), NPoly([0])]
         v_b = [NPoly([0]), NPoly([1])]
-
 
         while (r[-1] != NPoly({0: 0})) and (r[-1] != NPoly({0: 1})):
             q, ri = r[-2].div_mod(r[-1], mod)
@@ -158,7 +160,6 @@ class R:
             u_a.append((u_a[-2] - q*u_a[-1]) % mod)
             v_b.append((v_b[-2] - q*v_b[-1]) % mod)
 
-
         if r[-1] == NPoly({0: 1}):
             coeffs = np.zeros(self.n)
             v = v_b[-1]
@@ -167,7 +168,24 @@ class R:
             coeffs[:len(v.a)] = v.a
             return R(self.n, coeffs)
         else:
+            print("Inverse not found!")
             return R(self.n, np.zeros(self.n))
+        
+    def get_inv_q(self, p: int, e: int):
+        b = self.get_inv_p(p)
+        if b == R(self.n, np.zeros(self.n)):
+            print("Inverse not found!")
+            return b
+        
+        e_cp = e
+        n = 2
+        while e_cp > 0:
+            b = (R(b.n, b.a * 2) - self * b * b) % (p**n)
+            e_cp = e_cp // 2
+            n *= 2
+
+        return b % (p**e)
+            
 
     def float_scalar_mult(self, s):
         return R(self.n, np.round(self.a * s))
@@ -224,16 +242,17 @@ def solve_NTRU_eq(f, g, q):
 # for k in range(4):
 #     print(a1 + np.roll(np.flip(a2), -n+k+1))
 
-# a = R(6,np.array([1, 5, 1, 1, 5, 6]))
-# b = NPoly({0:1, 3:5, 4:1})
+# a = NPoly([1, 0, 0, 0, 0, 0])
+# b = NPoly({251:1, 0:-1}) % 128
 
-# print(a.get_inv(11))
+# # print(a.get_inv(11))
 
-# print((a * a.get_inv(11)) % 11)
+# # print((a * a.get_inv(11)) % 11)
 # print(f'a =  {a}')
 # print(f'b =  {b}\n')
 
-# q, r = a.div_mod(b, 11)
+
+# q, r = a.div_mod(b, 128)
 
 # print('a = q*b + r')
 # print(f'q =  {q}')
@@ -241,4 +260,13 @@ def solve_NTRU_eq(f, g, q):
 
 # print('\n Check')
 
-# print(f'q*b + r =  {(q*b + r) % 11}')
+# print(f'q*b + r =  {(q*b + r) % 128}')
+
+
+# c = R(251, [1, 0, 1, 0, 1, 0])
+# print(c)
+
+# inv = c.get_inv_q(2, 7)
+# print(inv)
+
+# print((c * inv) % 128)
